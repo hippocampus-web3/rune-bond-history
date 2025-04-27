@@ -15,7 +15,7 @@ interface ThornodeNode {
 }
 
 export class NodeService {
-    private readonly baseUrl = 'https://thornode-v2.ninerealms.com/thorchain';
+    private readonly baseUrl = process.env.THORNODE_URL;
 
     async getNodes(blockNumber: number): Promise<ThornodeNode[]> {
         logger.debug(`Fetching nodes for block ${blockNumber}...`);

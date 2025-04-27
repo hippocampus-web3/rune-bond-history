@@ -10,6 +10,7 @@ export const AppDataSource = new DataSource({
     username: process.env.DB_USERNAME || 'postgres',
     password: process.env.DB_PASSWORD || 'postgres',
     database: process.env.DB_NAME || 'thorchain_indexer',
+    ssl: { rejectUnauthorized: false },
     synchronize: false,
     logging: true,
     entities: ['src/entities/*.ts'],

@@ -136,7 +136,7 @@ export class IndexerService {
         let indexedCount = 0;
         let skippedCount = 0;
         let failedCount = 0;
-        const MIN_BLOCK_HEIGHT = 17466148;
+        const MIN_BLOCK_HEIGHT = 0; // 17466148 for non archive
 
         for (const churn of sortedChurns) {
             const blockNumber = parseInt(churn.height);
