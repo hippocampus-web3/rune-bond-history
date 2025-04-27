@@ -1,4 +1,5 @@
 import { DataSource } from 'typeorm';
+import { join } from 'path';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -13,8 +14,8 @@ export const AppDataSource = new DataSource({
     ssl: { rejectUnauthorized: false },
     synchronize: false,
     logging: true,
-    entities: ['src/entities/*.ts'],
-    migrations: ['src/migrations/*.ts'],
-    subscribers: ['src/subscribers/*.ts'],
+    entities: [join(__dirname, '../entities/*.{ts,js}')],
+    migrations: [join(__dirname, '../migrations/*.{ts,js}')],
+    subscribers: [],
     migrationsRun: true,
 }); 

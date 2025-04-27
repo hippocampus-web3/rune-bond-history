@@ -4,7 +4,8 @@
   "description": "Thorchain churn indexer",
   "main": "dist/indexer.js",
   "scripts": {
-    "build": "tsc",
+    "clean": "rimraf dist",
+    "build": "npm run clean && tsc",
     "start": "node dist/indexer.js",
     "dev": "ts-node src/indexer.ts",
     "backfill": "ts-node src/indexer.ts --backfill",
@@ -31,6 +32,7 @@
     "winston": "^3.17.0"
   },
   "devDependencies": {
+    "rimraf": "^5.0.10",
     "ts-node": "^10.9.2",
     "typeorm-extension": "^0.3.0"
   }

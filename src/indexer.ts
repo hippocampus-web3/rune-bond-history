@@ -3,7 +3,7 @@ import { AppDataSource } from './config/database';
 import { IndexerService } from './services/IndexerService';
 import { logger } from './utils/logger';
 
-const CHECK_INTERVAL = 12 * 60 * 60 * 1000; // 12 horas en milisegundos
+const CHECK_INTERVAL = 12 * 60 * 60 * 1000; // 12 hours in milliseconds
 
 async function runIndexer() {
     try {

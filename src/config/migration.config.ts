@@ -1,8 +1,9 @@
 import { DataSource } from 'typeorm';
 import { AppDataSource } from './database';
+import { join } from 'path';
 
 export const migrationDataSource = new DataSource({
     ...AppDataSource.options,
-    migrations: ['src/migrations/*.ts'],
+    migrations: [join(__dirname, "migrations/*.{ts,js}")],
     migrationsTableName: 'migrations',
 }); 
