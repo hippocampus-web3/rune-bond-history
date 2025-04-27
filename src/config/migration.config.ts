@@ -4,6 +4,6 @@ import { join } from 'path';
 
 export const migrationDataSource = new DataSource({
     ...AppDataSource.options,
-    migrations: [join(__dirname, "migrations/*.{ts,js}")],
+    migrations: [join(__dirname, '../migrations/*.{ts,js}')],
     migrationsTableName: 'migrations',
 }); 

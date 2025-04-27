@@ -32,4 +32,12 @@ export class NodeService {
         logger.debug(`Total active bond: ${totalBond} (from ${activeNodes.length} active nodes)`);
         return totalBond;
     }
+
+    calculateTotalActiveEarnings(nodes: ThornodeNode[]): number {
+        logger.debug('Calculating total active earnings...');
+        const activeNodes = nodes.filter(node => node.status === 'Active');
+        const totalEarnings = activeNodes.reduce((sum, node) => sum + Number(node.current_award), 0);
+        logger.debug(`Total active earnings: ${totalEarnings} (from ${activeNodes.length} active nodes)`);
+        return totalEarnings;
+    }
 } 

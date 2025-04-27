@@ -15,6 +15,9 @@ export class Snapshot {
     @Column({ type: 'numeric' })
     total_active_bond!: number;
 
+    @Column({ type: 'numeric', nullable: true })
+    total_earnings!: number;
+
     @OneToMany(() => Node, (node: Node) => node.snapshot)
     nodes!: Node[];
 } 

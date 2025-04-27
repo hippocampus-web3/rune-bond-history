@@ -47,6 +47,9 @@ export class IndexerService {
         const totalActiveBond = this.nodeService.calculateTotalActiveBond(nodes);
         logger.info(`Total active bond: ${totalActiveBond}`);
 
+        const totalEarnings = this.nodeService.calculateTotalActiveEarnings(nodes);
+        logger.info(`Total active earnings: ${totalEarnings}`);
+
         const queryRunner = AppDataSource.createQueryRunner();
         await queryRunner.connect();
         await queryRunner.startTransaction();
@@ -57,6 +60,7 @@ export class IndexerService {
             snapshot.block_number = blockNumber;
             snapshot.block_timestamp = blockTime;
             snapshot.total_active_bond = totalActiveBond;
+            snapshot.total_earnings = totalEarnings;
 
             const savedSnapshot = await queryRunner.manager.save(snapshot);
             logger.info(`Snapshot created with ID: ${savedSnapshot.id}`);
