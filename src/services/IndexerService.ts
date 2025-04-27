@@ -95,7 +95,6 @@ export class IndexerService {
             await queryRunner.commitTransaction();
             logger.info('Finished processing nodes');
 
-            // Aplicar delay solo después de indexar exitosamente
             await new Promise(resolve => setTimeout(resolve, 2000));
 
         } catch (error) {
@@ -130,7 +129,6 @@ export class IndexerService {
         const churns = await this.churnService.getChurns();
         logger.info(`Found ${churns.length} churns in total`);
 
-        // Ordenar churns por altura (más nuevo primero)
         const sortedChurns = churns.sort((a, b) => parseInt(b.height) - parseInt(a.height));
 
         let indexedCount = 0;
@@ -164,7 +162,6 @@ export class IndexerService {
                 logger.error(`Failed to index block ${blockNumber}:`, { error });
                 logger.info('Continuing with next block...');
                 
-                // En caso de error, esperar un poco más antes de continuar
                 await new Promise(resolve => setTimeout(resolve, 4000));
             }
         }
