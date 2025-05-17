@@ -23,7 +23,9 @@
   "license": "ISC",
   "dependencies": {
     "@types/node": "^20.11.24",
+    "@xchainjs/xchain-util": "^2.0.0",
     "axios": "^1.6.7",
+    "bullmq": "^5.1.1",
     "dotenv": "^16.4.5",
     "pg": "^8.11.3",
     "reflect-metadata": "^0.2.1",

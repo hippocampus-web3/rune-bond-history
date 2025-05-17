@@ -4,16 +4,54 @@ import { Node } from '../entities/Node';
 import { BondProvider } from '../entities/BondProvider';
 import { ChurnService } from './ChurnService';
 import { NodeService } from './NodeService';
+import { NotificationService } from './NotificationService';
 import { nanoToDate } from '../utils/timeUtils';
 import { logger } from '../utils/logger';
+import { LessThan } from 'typeorm';
+import { baseToAsset, baseAmount } from '@xchainjs/xchain-util';
 
 export class IndexerService {
     private churnService: ChurnService;
     private nodeService: NodeService;
+    private notificationService: NotificationService;
 
     constructor() {
         this.churnService = new ChurnService();
         this.nodeService = new NodeService();
+        this.notificationService = NotificationService.getInstance();
+    }
+
+    private async getPreviousNodeStatus(nodeAddress: string, currentBlockNumber: number): Promise<string | null> {
+        const nodeRepository = AppDataSource.getRepository(Node);
+        const previousNode = await nodeRepository.findOne({
+            where: { 
+                node_address: nodeAddress,
+                block_number: LessThan(currentBlockNumber)
+            },
+            order: { block_number: 'DESC' },
+            select: ['status', 'block_number']
+        });
+
+        if (!previousNode) {
+            return null;
+        }
+
+        return previousNode.status;
+    }
+
+    private async getPreviousBondBalance(nodeAddress: string, bondProviderAddress: string, currentBlockNumber: number): Promise<number | null> {
+        const bondProviderRepository = AppDataSource.getRepository(BondProvider);
+        const previousBond = await bondProviderRepository.findOne({
+            where: { 
+                node_address: nodeAddress,
+                bond_provider_address: bondProviderAddress,
+                block_number: LessThan(currentBlockNumber)
+            },
+            order: { block_number: 'DESC' },
+            select: ['bond_amount']
+        });
+
+        return previousBond?.bond_amount ?? null;
     }
 
     async getLastIndexedBlock(): Promise<number | null> {
@@ -68,7 +106,7 @@ export class IndexerService {
             logger.info('Processing nodes...');
             for (const nodeData of nodes) {
                 logger.debug(`Processing node: ${nodeData.node_address}`);
-                
+
                 const node = new Node();
                 node.block_number = blockNumber;
                 node.node_address = nodeData.node_address;
@@ -76,7 +114,7 @@ export class IndexerService {
                 node.earnings = Number(nodeData.current_award);
                 node.status = nodeData.status;
                 node.snapshot = savedSnapshot;
-
+                const previousStatus = await this.getPreviousNodeStatus(nodeData.node_address, blockNumber);
                 const savedNode = await queryRunner.manager.save(node);
                 logger.debug(`Node saved with ID: ${savedNode.id}`);
 
@@ -91,7 +129,46 @@ export class IndexerService {
                         bondProvider.bond_amount = Number(provider.bond);
                         bondProvider.node = savedNode;
 
+                        const previousBondBalance = await this.getPreviousBondBalance(
+                            nodeData.node_address,
+                            provider.bond_address,
+                            blockNumber
+                        );
+
                         await queryRunner.manager.save(bondProvider);
+
+                        const bondAmount = Number(provider.bond);
+                        
+                        if (previousStatus !== null && 
+                            previousStatus !== nodeData.status &&
+                            !((previousStatus === 'Active' && nodeData.status === 'Ready') ||
+                              (previousStatus === 'Ready' && nodeData.status === 'Active'))) {
+                            
+                            if (bondAmount > 0) {
+                                logger.debug(`Sending status change notification to bond provider ${provider.bond_address} with ${bondAmount} RUNE bonded`);
+                                await this.notificationService.emitNodeStatusChanged(
+                                    provider.bond_address,
+                                    nodeData.node_address,
+                                    nodeData.status,
+                                    `Status changed from ${previousStatus} to ${nodeData.status} at block ${blockNumber}. Remember that nodes in standby mode do not generate rewards, but this is when UNBOND becomes possible.`
+                                );
+                            }
+                        }
+
+                        if (nodeData.status === 'Active' && previousBondBalance !== null) {
+                            const prevBondBalanceAssetAmount = baseToAsset(baseAmount(previousBondBalance.toString())).amount().toFixed(3);
+                            const newBondBalanceAssetAmount = baseToAsset(baseAmount(provider.bond)).amount().toFixed(3);
+                            if (prevBondBalanceAssetAmount !== newBondBalanceAssetAmount) {
+                                logger.debug(`Sending bond balance change notification to provider ${provider.bond_address}`);
+                                await this.notificationService.emitNodeChurn(
+                                    provider.bond_address,
+                                    nodeData.node_address,
+                                    prevBondBalanceAssetAmount,
+                                    newBondBalanceAssetAmount,
+                                    'RUNE',
+                                );
+                            }
+                        }
                     }
                 }
             }
@@ -133,7 +210,7 @@ export class IndexerService {
         const churns = await this.churnService.getChurns();
         logger.info(`Found ${churns.length} churns in total`);
 
-        const sortedChurns = churns.sort((a, b) => parseInt(b.height) - parseInt(a.height));
+        const sortedChurns = churns.sort((a, b) => parseInt(a.height) - parseInt(b.height));
 
         let indexedCount = 0;
         let skippedCount = 0;
