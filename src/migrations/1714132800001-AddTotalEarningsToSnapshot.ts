@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class AddTotalEarningsToSnapshot1710000000000 implements MigrationInterface {
-    name = 'AddTotalEarningsToSnapshot1710000000000'
+export class AddTotalEarningsToSnapshot1714132800001 implements MigrationInterface {
+    name = 'AddTotalEarningsToSnapshot1714132800001'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         await queryRunner.query(`ALTER TABLE "snapshot" ADD COLUMN "total_earnings" numeric`);
