@@ -75,12 +75,15 @@ export class IndexerService {
             return;
         }
 
-        const indexingBlock = blockNumber - 100;
-        logger.info(`Using block ${indexingBlock} for indexing (original churn block: ${blockNumber})`);
+        const indexingBlockEarnings = blockNumber - 100; // For earnings it's importart use a block prior to the churn but for status it's not
+        logger.info(`Using block ${indexingBlockEarnings} for indexing (original churn block: ${blockNumber})`);
 
-        logger.info(`Fetching nodes for block ${indexingBlock}...`);
-        const nodes = await this.nodeService.getNodes(indexingBlock);
+        logger.info(`Fetching nodes for block ${indexingBlockEarnings} for earnings...`);
+        const nodes = await this.nodeService.getNodes(indexingBlockEarnings);
         logger.info(`Found ${nodes.length} nodes`);
+
+        const nodesAfterChurn = await this.nodeService.getNodes(blockNumber + 100);
+        logger.info(`Found ${nodesAfterChurn.length} nodes`);
 
         const totalActiveBond = this.nodeService.calculateTotalActiveBond(nodes);
         logger.info(`Total active bond: ${totalActiveBond}`);
@@ -107,30 +110,37 @@ export class IndexerService {
             for (const nodeData of nodes) {
                 logger.debug(`Processing node: ${nodeData.node_address}`);
 
+                const nodeAfterChurn = nodesAfterChurn.find(n => n.node_address === nodeData.node_address);
+
+                if (!nodeAfterChurn) {
+                    logger.error(`Node ${nodeData.node_address} not found after churn`);
+                    continue;
+                }
+
                 const node = new Node();
                 node.block_number = blockNumber;
-                node.node_address = nodeData.node_address;
-                node.total_bond = Number(nodeData.total_bond);
+                node.node_address = nodeAfterChurn.node_address;
+                node.total_bond = Number(nodeAfterChurn.total_bond);
                 node.earnings = Number(nodeData.current_award);
-                node.status = nodeData.status;
+                node.status = nodeAfterChurn.status; // Important get the status from the node after the churn
                 node.snapshot = savedSnapshot;
-                const previousStatus = await this.getPreviousNodeStatus(nodeData.node_address, blockNumber);
+                const previousStatus = await this.getPreviousNodeStatus(nodeAfterChurn.node_address, blockNumber);
                 const savedNode = await queryRunner.manager.save(node);
                 logger.debug(`Node saved with ID: ${savedNode.id}`);
 
-                if (nodeData.bond_providers?.providers?.length) {
-                    logger.debug(`Processing ${nodeData.bond_providers.providers.length} bond providers for node ${nodeData.node_address}`);
+                if (nodeAfterChurn.bond_providers?.providers?.length) {
+                    logger.debug(`Processing ${nodeAfterChurn.bond_providers.providers.length} bond providers for node ${nodeAfterChurn.node_address}`);
                     
-                    for (const provider of nodeData.bond_providers.providers) {
+                    for (const provider of nodeAfterChurn.bond_providers.providers) {
                         const bondProvider = new BondProvider();
                         bondProvider.block_number = blockNumber;
-                        bondProvider.node_address = nodeData.node_address;
+                        bondProvider.node_address = nodeAfterChurn.node_address;
                         bondProvider.bond_provider_address = provider.bond_address;
                         bondProvider.bond_amount = Number(provider.bond);
                         bondProvider.node = savedNode;
 
                         const previousBondBalance = await this.getPreviousBondBalance(
-                            nodeData.node_address,
+                            nodeAfterChurn.node_address,
                             provider.bond_address,
                             blockNumber
                         );
@@ -140,29 +150,29 @@ export class IndexerService {
                         const bondAmount = Number(provider.bond);
                         
                         if (previousStatus !== null && 
-                            previousStatus !== nodeData.status &&
-                            !((previousStatus === 'Active' && nodeData.status === 'Ready') ||
-                              (previousStatus === 'Ready' && nodeData.status === 'Active'))) {
+                            previousStatus !== nodeAfterChurn.status &&
+                            !((previousStatus === 'Active' && nodeAfterChurn.status === 'Ready') ||
+                              (previousStatus === 'Ready' && nodeAfterChurn.status === 'Active'))) {
                             
                             if (bondAmount > 0) {
                                 logger.debug(`Sending status change notification to bond provider ${provider.bond_address} with ${bondAmount} RUNE bonded`);
                                 await this.notificationService.emitNodeStatusChanged(
                                     provider.bond_address,
-                                    nodeData.node_address,
-                                    nodeData.status,
-                                    `Status changed from ${previousStatus} to ${nodeData.status} at block ${blockNumber}. Remember that nodes in standby mode do not generate rewards, but this is when UNBOND becomes possible.`
+                                    nodeAfterChurn.node_address,
+                                    nodeAfterChurn.status,
+                                    `Status changed from ${previousStatus} to ${nodeAfterChurn.status} at block ${blockNumber}. Remember that nodes in standby mode do not generate rewards, but this is when UNBOND becomes possible.`
                                 );
                             }
                         }
 
-                        if (nodeData.status === 'Active' && previousBondBalance !== null) {
+                        if (nodeAfterChurn.status === 'Active' && previousBondBalance !== null) {
                             const prevBondBalanceAssetAmount = baseToAsset(baseAmount(previousBondBalance.toString())).amount().toFixed(3);
                             const newBondBalanceAssetAmount = baseToAsset(baseAmount(provider.bond)).amount().toFixed(3);
                             if (prevBondBalanceAssetAmount !== newBondBalanceAssetAmount) {
                                 logger.debug(`Sending bond balance change notification to provider ${provider.bond_address}`);
                                 await this.notificationService.emitNodeChurn(
                                     provider.bond_address,
-                                    nodeData.node_address,
+                                    nodeAfterChurn.node_address,
                                     prevBondBalanceAssetAmount,
                                     newBondBalanceAssetAmount,
                                     'RUNE',
